@@ -1,0 +1,17 @@
+# Locked model choices. Changing the benchmark model invalidates every prior
+# measurement in results/benchmarks.csv. Do not edit after Phase 0.
+
+# Used only on the laptop (GTX 1650, ~4GB). Never logged as a result.
+dryrun_model: Qwen/Qwen2.5-0.5B-Instruct
+
+# Locked for all Kaggle / AWS measurements. Pick once, never change.
+benchmark_model: Qwen/Qwen2.5-3B-Instruct
+
+# Rung 2 (INT4 AWQ). Same base model, quantized weights only.
+benchmark_model_awq: Qwen/Qwen2.5-3B-Instruct-AWQ
+
+# dtype: fp16 on T4 / GTX 1650 (cc 7.5). bfloat16 is not properly supported.
+dtype: float16
+
+max_model_len: 4096
+max_new_tokens: 256

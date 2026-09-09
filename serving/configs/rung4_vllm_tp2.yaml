@@ -1,0 +1,12 @@
+# Rung 4 — Tensor parallelism across 2x T4. Most likely to disappoint (PCIe, not NVLink).
+rung: 4
+name: vllm_tp2
+backend: vllm
+model_ref: benchmark
+tensor_parallel_size: 2
+quantization: null
+enable_prefix_caching: false
+max_new_tokens: 256
+dtype: float16
+gpu_memory_utilization: 0.90
+notes: "TP=2 on Kaggle 2xT4 over PCIe. Uncertain; interconnect may dominate."

@@ -1,0 +1,52 @@
+[
+  {
+    "question_id": "dev-001",
+    "question": "How do I declare a path parameter in FastAPI?",
+    "context": "From FastAPI docs (Path Parameters): Declare path parameters with the same syntax used by Python format strings. Example: @app.get(\"/items/{item_id}\") async def read_item(item_id: int): ..."
+  },
+  {
+    "question_id": "dev-002",
+    "question": "What is the difference between Query and Path in FastAPI?",
+    "context": "From FastAPI docs: Path is used to declare path parameters. Query is used for query parameters. Both come from fastapi and support validation via Annotated."
+  },
+  {
+    "question_id": "dev-003",
+    "question": "How do I return a JSON response with a custom status code?",
+    "context": "From FastAPI docs (Response Status Code): Use status_code= in the path operation decorator, or return a Response / JSONResponse with status_code set."
+  },
+  {
+    "question_id": "dev-004",
+    "question": "How do I add CORS middleware?",
+    "context": "From FastAPI docs (CORS): from fastapi.middleware.cors import CORSMiddleware; app.add_middleware(CORSMiddleware, allow_origins=[...], allow_methods=[...], allow_headers=[...])."
+  },
+  {
+    "question_id": "dev-005",
+    "question": "How do I depend on a database session with Depends?",
+    "context": "From FastAPI docs (Dependencies): Define a generator that yields a session and use Depends(get_db) as a path operation parameter. FastAPI closes the generator after the request."
+  },
+  {
+    "question_id": "dev-006",
+    "question": "How do I upload a file with FastAPI?",
+    "context": "From FastAPI docs (Request Files): Use UploadFile or bytes with File(). UploadFile is preferred for large files because it uses a spooled file."
+  },
+  {
+    "question_id": "dev-007",
+    "question": "How do I define a Pydantic response model?",
+    "context": "From FastAPI docs (Response Model): Pass response_model=YourModel to the path operation decorator. FastAPI filters the output to that schema."
+  },
+  {
+    "question_id": "dev-008",
+    "question": "How do I run background tasks after a response?",
+    "context": "From FastAPI docs (Background Tasks): Inject BackgroundTasks and call background_tasks.add_task(func, *args). Tasks run after the response is sent."
+  },
+  {
+    "question_id": "dev-009",
+    "question": "How do I secure an endpoint with OAuth2 password flow?",
+    "context": "From FastAPI docs (Security): Use OAuth2PasswordBearer and Depends to extract the token, then validate it in a dependency before the path operation runs."
+  },
+  {
+    "question_id": "dev-010",
+    "question": "How do I mount a sub-application with APIRouter?",
+    "context": "From FastAPI docs (Bigger Applications): Create an APIRouter, include routes on it, then app.include_router(router, prefix=\"/api\")."
+  }
+]
