@@ -118,16 +118,21 @@ def load_model(model_id: str, dtype: str = "float16") -> None:
     global _tokenizer, _model, _model_id
     _model_id = model_id
     torch_dtype = torch.float16 if dtype == "float16" and _device == "cuda" else torch.float32
-    print(f"[hf] loading {model_id} on {_device} dtype={torch_dtype}")
+    # Pin to cuda:0 only. device_map="auto" on Kaggle 2xT4 can spread/hang even when
+    # Phase 1 intends a single-GPU (kaggle_t4_x1) measurement.
+    print(f"[hf] loading {model_id} on {_device} dtype={torch_dtype}", flush=True)
     _tokenizer = AutoTokenizer.from_pretrained(model_id)
-    _model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        dtype=torch_dtype,
-        device_map="auto" if _device == "cuda" else None,
-    )
-    if _device == "cpu":
+    if _device == "cuda":
+        _model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            dtype=torch_dtype,
+            device_map={"": 0},
+        )
+    else:
+        _model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch_dtype)
         _model = _model.to(_device)
     _model.eval()
+    print("[hf] model ready", flush=True)
 
 
 def main() -> None:
