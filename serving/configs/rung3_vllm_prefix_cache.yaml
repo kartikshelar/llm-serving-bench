@@ -1,0 +1,12 @@
+# Rung 3 — Prefix caching (RAG system prompt is near-constant).
+rung: 3
+name: vllm_prefix_cache
+backend: vllm
+model_ref: benchmark
+tensor_parallel_size: 1
+quantization: null
+enable_prefix_caching: true
+max_new_tokens: 256
+dtype: float16
+gpu_memory_utilization: 0.90
+notes: "Prefix caching enabled. Expected to help on repeated RAG system prompt."

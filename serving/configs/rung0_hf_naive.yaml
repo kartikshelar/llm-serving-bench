@@ -1,0 +1,11 @@
+# Rung 0 — Naive HuggingFace generate (one request at a time). Baseline.
+rung: 0
+name: hf_naive
+backend: huggingface
+model_ref: benchmark  # resolved via serving/models.yaml; dry-run overrides
+tensor_parallel_size: 1
+quantization: null
+enable_prefix_caching: false
+max_new_tokens: 256
+dtype: float16
+notes: "Sequential HF generate. No continuous batching."

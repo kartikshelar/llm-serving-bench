@@ -1,0 +1,11 @@
+# GPU serving stack (install on machine with CUDA matching your driver).
+# Pin loosely in Phase 0; tighten after first successful Kaggle run.
+torch>=2.2.0
+transformers>=4.44.0
+accelerate>=0.33.0
+vllm>=0.5.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0
+pyyaml>=6.0
+autoawq>=0.2.0; platform_system != "Windows"

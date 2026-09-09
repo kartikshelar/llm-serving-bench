@@ -1,0 +1,12 @@
+# Rung 2 — INT4 AWQ weight quantization on vLLM.
+rung: 2
+name: vllm_awq
+backend: vllm
+model_ref: benchmark_awq
+tensor_parallel_size: 1
+quantization: awq
+enable_prefix_caching: false
+max_new_tokens: 256
+dtype: float16
+gpu_memory_utilization: 0.90
+notes: "AWQ INT4 weights. Accuracy not measured in this repo."

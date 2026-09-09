@@ -1,0 +1,3 @@
+# Bench harness — no GPU required. Enough for dryrun.py and sweep against a remote server.
+httpx>=0.27.0
+pyyaml>=6.0
