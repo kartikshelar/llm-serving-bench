@@ -1,7 +1,7 @@
 # llm-serving-bench — Project Brief
 
 **Owner:** Kartik Pradip Shelar
-**Status:** Phase 0 done — ready for Phase 1 (Kaggle)
+**Status:** Phase 2 in progress — rung 2 (AWQ) next on Kaggle
 **Created:** 2026-09-05
 **Purpose of this file:** complete, standalone context for building this project.
 Anyone (or any agent) reading only this file should be able to start work.

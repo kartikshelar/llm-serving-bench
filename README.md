@@ -9,8 +9,8 @@ tensor parallelism).
 different model here means those figures do not transfer. This repo never
 imports or restates SourceBound accuracy numbers.
 
-**Status:** Phase 0 done. No benchmark numbers yet —
-`results/benchmarks.csv` has a header only. Next: Phase 1 on Kaggle.
+**Status:** Phase 2 in progress (rung 2 AWQ next). Phase 1 numbers are in
+`results/benchmarks.csv` (`kaggle_t4_x1`, rungs 0–1).
 
 ---
 
