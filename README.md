@@ -9,8 +9,8 @@ tensor parallelism).
 different model here means those figures do not transfer. This repo never
 imports or restates SourceBound accuracy numbers.
 
-**Status:** Phase 3 done (AWS reduced ladder + GHA→ECR). Phase 4 write-up next.
-Numbers live in `results/benchmarks.csv` (`kaggle_t4_*`, `aws_g4dn.xlarge`).
+**Status:** Phase 4 complete. All figures below are means of three
+`errors=0` repeats from [`results/benchmarks.csv`](results/benchmarks.csv).
 
 ---
 
@@ -26,31 +26,75 @@ dtype: **fp16** (T4 / GTX 1650 are cc 7.5; bf16 not properly supported).
 
 ---
 
-## Pre-registered predictions
+## Results
 
-Written **before** any Kaggle or AWS run. Outcomes go in `docs/findings.md`.
+Peak sustainable **output** tok/s = concurrency that maximized mean throughput
+with zero errors. Hardware label on every row. Full sweep (c=1…32) in the CSV.
 
-| Rung | Change | Prediction on this RAG workload |
-|---|---|---|
-| 0 | HF `generate`, serial | Slowest. Baseline by design. |
-| 1 | vLLM continuous batching | Large throughput gain vs 0, especially at concurrency ≥8. |
-| 2 | AWQ INT4 | Moderate throughput / memory win. Accuracy **not** measured here. |
-| 3 | Prefix caching | Should help: system prompt + retrieval framing is near-constant. |
-| 4 | TP=2 on 2×T4 | Uncertain / likely disappointing. Kaggle T4s are PCIe, not NVLink; interconnect may dominate for a 3B model. |
+| hardware | rung | what | concurrency | mean out tok/s | mean e2e p50 (ms) |
+|---|---:|---|---:|---:|---:|
+| kaggle_t4_x1 | 0 | HF naive | 4 | 19.7 | 27974 |
+| kaggle_t4_x1 | 1 | vLLM | 32 | 509.0 | 6613 |
+| kaggle_t4_x1 | 2 | AWQ INT4 | 32 | 440.6 | 7193 |
+| kaggle_t4_x1 | 3 | prefix cache | 32 | 488.8 | 6599 |
+| kaggle_t4_x2 | 4 | TP=2 | 32 | 241.7 | 12782 |
+| aws_g4dn.xlarge | 0 | HF naive | 4 | 26.2 | 20948 |
+| aws_g4dn.xlarge | 1 | vLLM | 32 | 472.0 | 6976 |
+| aws_g4dn.xlarge | 3 | prefix cache | 32 | 516.9 | 6306 |
+
+AWS cold start (container → `/health`): **206 s** (CSV notes, Phase 3 session).
+
+See also: [cost model](results/cost_model.md) · [findings](docs/findings.md)
 
 ---
 
-## Results
+## Pre-registered predictions versus outcomes
 
-Every number that leaves this project must appear in `results/benchmarks.csv`
-with a `hardware` label (`kaggle_t4_x1`, `kaggle_t4_x2`, or `aws_<instance>`).
-Laptop timings are rejected by the logger.
+Written **before** any Kaggle or AWS run.
 
-| hardware | rung | concurrency | out tok/s | e2e p50 | notes |
-|---|---|---|---|---|---|
-| _empty until Phase 1_ | | | | | |
+| Rung | Prediction | What happened |
+|---|---|---|
+| 0 HF `generate` | Slowest baseline | Confirmed — flat ~20–26 tok/s, latency explodes with concurrency. |
+| 1 vLLM batching | Large gain vs 0 at c≥8 | Confirmed — ~25× throughput vs HF at peak on T4. |
+| 2 AWQ INT4 | Moderate throughput win | **Miss** — slower than fp16 vLLM (~441 vs ~509 tok/s). |
+| 3 Prefix cache | Should help shared RAG prefix | **Mostly miss** — no win on Kaggle; small AWS-only bump at c=32. |
+| 4 TP=2 on 2×T4 | Likely disappointing (PCIe) | Confirmed — ~242 tok/s, ~half of single-GPU vLLM. |
 
-See also: [cost model](results/cost_model.md) · [findings](docs/findings.md)
+---
+
+## Cost (AWS spot)
+
+Price: **$0.2562/hr** `g4dn.xlarge` Linux/UNIX spot, `us-west-2b`,
+2026-09-12T15:00Z (`describe-spot-price-history`).
+
+| hardware | rung | mean out tok/s | $/M output tokens |
+|---|---:|---:|---:|
+| aws_g4dn.xlarge | 0 | 26.2 | **2.72** |
+| aws_g4dn.xlarge | 1 | 472.0 | **0.151** |
+| aws_g4dn.xlarge | 3 | 516.9 | **0.138** |
+
+Method and caveats: [`results/cost_model.md`](results/cost_model.md). Kaggle is free → no $/M.
+
+---
+
+## What didn't work
+
+Equal billing with wins. Detail in [`docs/findings.md`](docs/findings.md).
+
+1. **AWQ (rung 2)** — expected a throughput or memory win; measured **lower**
+   tok/s than fp16 vLLM on the same Kaggle T4 at every concurrency. Accuracy
+   not measured; do not spin this as “better, just slower.”
+2. **Prefix caching (rung 3)** — shared system+retrieval framing should have
+   helped. On Kaggle it did not beat rung 1; on AWS the gain is small and
+   concurrency-specific. Not a clean optimization story.
+3. **Tensor parallelism on 2×T4 (rung 4)** — PCIe interconnect tax dominated.
+   Two GPUs ≈ half the throughput of one. Pre-registered as likely; still a
+   first-class negative result.
+4. **HF streaming on AWS** — first Phase 3 HF sweep was all errors (server
+   rejects stream). Valid numbers required `--no-stream`. Rows with errors
+   remain in the CSV on purpose.
+5. **Spot capacity** — `us-west-2` often had no g4dn/g5 spot for days despite
+   quota. Multi-AZ + mixed instance types were required; still interruptible.
 
 ---
 
@@ -60,12 +104,7 @@ See also: [cost model](results/cost_model.md) · [findings](docs/findings.md)
 - **Speculative decoding** — cut deliberately (needs draft model; weak on long-prompt/short-output RAG)
 - **Multi-node serving** — out of scope
 - **Production traffic / real users** — this is a benchmark harness
-
----
-
-## What didn't work
-
-_Filled after measured negative results exist. Equal billing with wins._
+- **AWS rungs 2 and 4** — Phase 3 ran a reduced ladder (0/1/3) under the $25 ceiling
 
 ---
 
@@ -76,69 +115,49 @@ loadgen (bench/) → OpenAI-compatible HTTP → HF server (rung 0) or vLLM (rung
 ```
 
 Retrieval context is **frozen in the workload fixture** so only the generation
-layer changes across rungs. Phase 1+ swaps `workload/dev_questions.json` for
-SourceBound's 50-item dev split (same shape).
+layer changes across rungs. AWS path: GitHub Actions → ECR → SSM image URI →
+spot ASG `user_data` pull (compute off by default).
 
 ---
 
-## Phase 0 — reproduce locally (no metered GPU)
+## Reproduce
+
+### Phase 0 — laptop stub (no CSV)
 
 ```powershell
 cd llm-serving-bench
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements-bench.txt
-
-# Stub server + reduced sweep + hardware-gate check (writes nothing to CSV)
 python -m bench.dryrun --try-log-csv
 ```
 
-### Optional: real 0.5B model on GTX 1650
-
-```powershell
-pip install -r requirements.txt
-python -m serving.hf_server --rung 0 --dryrun-model --port 8000
-# other terminal:
-python -m bench.sweep --base-url http://127.0.0.1:8000 --hardware kaggle_t4_x1 `
-  --model Qwen/Qwen2.5-0.5B-Instruct --rung 0 --gpu-count 1 `
-  --concurrencies 1 --repeats 1 --requests-per-run 4 --no-stream
-```
-
-**Do not** pass laptop hardware labels. The example above uses `kaggle_t4_x1`
-only when you are actually on Kaggle. For laptop GPU smoke tests, use
-`bench.dryrun` or keep results out of `benchmarks.csv`.
-
-### Container build (Phase 0 definition of done)
-
-```powershell
-docker build -f serving/Dockerfile -t llm-serving-bench:dev .
-```
-
----
-
-## Measurement protocol (Phase 1+)
-
-- Concurrency: 1, 4, 8, 16, 32
-- Repeats: 3 per configuration
-- Warmup: discard first N requests (`--warmup-n`, default 2)
-- Append CSV **after every run**, never buffer to session end
+### Kaggle / AWS sweep
 
 ```powershell
 python -m bench.sweep `
   --base-url http://127.0.0.1:8000 `
-  --hardware kaggle_t4_x1 `
+  --hardware kaggle_t4_x1 `   # or aws_g4dn.xlarge on the instance
   --model Qwen/Qwen2.5-3B-Instruct `
   --rung 1 `
   --gpu-count 1
 ```
 
+Protocol: concurrency 1/4/8/16/32, 3 repeats, warmup discarded, append CSV
+after every run. HF needs `--no-stream`.
+
+### AWS infra
+
+Budget guardrails and destroy checklist: [`terraform/README.md`](terraform/README.md).
+Hard ceiling **$25**, alarm **$15**, spot only, no NAT. Deploy pipeline:
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
 ---
 
-## Repo layout
+## Related
 
-See `PROJECT_BRIEF.md` §12. Terraform + GitHub Actions deploy:
-`.github/workflows/deploy.yml` (OIDC → ECR → SSM). Setup:
-`terraform/README.md` (GitHub Actions section).
+- Accuracy / RAG evaluation: [SourceBound](https://github.com/kartikshelar/SourceBound)
+- This repo: throughput, latency, cost, IaC, GPU serving only
 
 ---
 

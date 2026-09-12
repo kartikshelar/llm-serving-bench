@@ -1,7 +1,7 @@
 # llm-serving-bench — Project Brief
 
 **Owner:** Kartik Pradip Shelar
-**Status:** Phase 3 measurements + GHA→ECR deploy path done — ready for Phase 4 (write-up)
+**Status:** Phase 4 complete (README results, findings, cost model, SourceBound cross-link)
 **Created:** 2026-09-05
 **Purpose of this file:** complete, standalone context for building this project.
 Anyone (or any agent) reading only this file should be able to start work.
@@ -371,6 +371,10 @@ fully closed.
 **Done when:** README contains the results table, the pre-registered predictions
 versus outcomes, the cost model, the failure analysis, and the hardware labels.
 Cross-links to SourceBound are in place in both repos.
+
+**Status (2026-09-12):** README + `docs/findings.md` + `results/cost_model.md`
+filled from `results/benchmarks.csv` only. Spot price dated via
+`describe-spot-price-history`. SourceBound README links back to this repo.
 
 **Estimated total:** 3–4 weekends, roughly 25 hours. Compute is not the
 bottleneck; the full sweep is 2–3 hours of actual GPU time. Debugging is the
