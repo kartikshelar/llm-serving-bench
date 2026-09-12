@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (NEVER commit terraform.tfvars — it may contain your email/IP).
+# First apply: leave enables false. Only budget + SNS.
+
+aws_region   = "us-west-2" # switch to us-east-1/2 if west-2 spot GPU capacity is empty
+alert_email  = "YOUR_EMAIL@example.com"
+
+# Keep these false until docs/aws-budget-guardrails.md checklist is done.
+enable_network = false
+enable_compute = false
+
+# When you eventually enable compute for a short session:
+# use_spot        = true          # must stay true
+# instance_type   = "g4dn.xlarge"
+# max_spot_price  = "0.30"
+# asg_max_size    = 1
+# allowed_cidr_api = "x.x.x.x/32"  # your public IP

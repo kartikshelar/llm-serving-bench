@@ -9,8 +9,9 @@ tensor parallelism).
 different model here means those figures do not transfer. This repo never
 imports or restates SourceBound accuracy numbers.
 
-**Status:** Phase 2 in progress (rung 2 AWQ next). Phase 1 numbers are in
-`results/benchmarks.csv` (`kaggle_t4_x1`, rungs 0–1).
+**Status:** Phase 3 in progress. Phase 1–2 numbers are in
+`results/benchmarks.csv`. AWS work starts with **budget lock** ($15 alarm /
+$25 ceiling) before any GPU is enabled — see `docs/aws-budget-guardrails.md`.
 
 ---
 
