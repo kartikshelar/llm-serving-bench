@@ -1,7 +1,7 @@
 # llm-serving-bench — Project Brief
 
 **Owner:** Kartik Pradip Shelar
-**Status:** Phase 2 done — ready for Phase 3 (AWS)
+**Status:** Phase 3 measurements + GHA→ECR deploy path done — ready for Phase 4 (write-up)
 **Created:** 2026-09-05
 **Purpose of this file:** complete, standalone context for building this project.
 Anyone (or any agent) reading only this file should be able to start work.
@@ -359,6 +359,13 @@ concurrency levels with three repeats each, labeled `kaggle_t4_x1`.
 GitHub Actions pipeline deploys to it, cold start is measured, a reduced
 three-rung ladder is in the CSV labeled `aws_*`, and `terraform destroy` tears
 it all down cleanly. Total spend under $25.
+
+**Status (2026-09-12):** Reduced ladder (`aws_g4dn.xlarge`, rungs 0/1/3) and
+cold start (~206s container→`/health`) are in `results/benchmarks.csv`. Compute
+destroyed after the session; network/budget/ECR kept. GHA OIDC → ECR push →
+SSM image URI → GPU `user_data` pull is in place (`.github/workflows/deploy.yml`).
+Confirm Billing total still under the $25 hard ceiling before calling Phase 3
+fully closed.
 
 ### Phase 4 — Write-up
 **Done when:** README contains the results table, the pre-registered predictions

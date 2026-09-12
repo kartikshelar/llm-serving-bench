@@ -1,0 +1,127 @@
+name: Deploy serving image
+
+# Build → ECR → record image URI → optional live ASG refresh.
+# Does NOT enable compute / start GPUs by itself (budget safety).
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "serving/**"
+      - "bench/**"
+      - "workload/**"
+      - "requirements.txt"
+      - "requirements-bench.txt"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      refresh_instances:
+        description: "If ASG is up, start an instance refresh to pull the new image"
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: llm-serving-bench-serving
+  IMAGE_PARAM: /llm-serving-bench/serving_image
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_uri: ${{ steps.meta.outputs.image_uri }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Image metadata
+        id: meta
+        run: |
+          REGISTRY="${{ steps.ecr.outputs.registry }}"
+          SHA_TAG="sha-${GITHUB_SHA::12}"
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${SHA_TAG}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Building ${IMAGE_URI}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: serving/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish image URI to SSM
+        run: |
+          aws ssm put-parameter \
+            --name "${IMAGE_PARAM}" \
+            --type String \
+            --value "${{ steps.meta.outputs.image_uri }}" \
+            --overwrite
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to live ASG (optional)
+        env:
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image_uri }}
+          DO_REFRESH: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh_instances || github.event_name == 'push' }}
+        run: |
+          set -euo pipefail
+          ASG="llm-serving-bench-gpu-asg"
+          echo "Published image: ${IMAGE_URI}"
+
+          if ! aws autoscaling describe-auto-scaling-groups \
+              --auto-scaling-group-names "${ASG}" \
+              --query "AutoScalingGroups[0].AutoScalingGroupName" \
+              --output text 2>/dev/null | grep -q "${ASG}"; then
+            echo "ASG not present (enable_compute=false). Image is in ECR/SSM; next GPU boot will pull it."
+            exit 0
+          fi
+
+          DESIRED="$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "${ASG}" \
+            --query "AutoScalingGroups[0].DesiredCapacity" \
+            --output text)"
+          echo "ASG desired=${DESIRED}"
+
+          if [[ "${DESIRED}" == "0" || "${DO_REFRESH}" != "true" ]]; then
+            echo "Skipping instance refresh (desired=0 or refresh disabled)."
+            exit 0
+          fi
+
+          # Rolling replace so new user_data / ECR pull path runs.
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name "${ASG}" \
+            --preferences MinHealthyPercentage=0,InstanceWarmup=120
+          echo "Instance refresh started for ${ASG}"

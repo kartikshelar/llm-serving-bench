@@ -9,8 +9,8 @@ tensor parallelism).
 different model here means those figures do not transfer. This repo never
 imports or restates SourceBound accuracy numbers.
 
-**Status:** Phase 2 in progress (rung 2 AWQ next). Phase 1 numbers are in
-`results/benchmarks.csv` (`kaggle_t4_x1`, rungs 0–1).
+**Status:** Phase 3 done (AWS reduced ladder + GHA→ECR). Phase 4 write-up next.
+Numbers live in `results/benchmarks.csv` (`kaggle_t4_*`, `aws_g4dn.xlarge`).
 
 ---
 
@@ -136,8 +136,9 @@ python -m bench.sweep `
 
 ## Repo layout
 
-See `PROJECT_BRIEF.md` §12. Terraform and GitHub Actions deploy land in Phase 3;
-not started until Phase 2 is done.
+See `PROJECT_BRIEF.md` §12. Terraform + GitHub Actions deploy:
+`.github/workflows/deploy.yml` (OIDC → ECR → SSM). Setup:
+`terraform/README.md` (GitHub Actions section).
 
 ---
 

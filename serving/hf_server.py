@@ -125,11 +125,11 @@ def load_model(model_id: str, dtype: str = "float16") -> None:
     if _device == "cuda":
         _model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            dtype=torch_dtype,
+            torch_dtype=torch_dtype,
             device_map={"": 0},
         )
     else:
-        _model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch_dtype)
+        _model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch_dtype)
         _model = _model.to(_device)
     _model.eval()
     print("[hf] model ready", flush=True)
