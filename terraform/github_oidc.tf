@@ -7,11 +7,21 @@ variable "github_repository" {
   default     = "kartikshelar/llm-serving-bench"
 }
 
+# Repos created after 2026-07-15 use immutable OIDC sub claims:
+#   repo:owner@OWNER_ID/name@REPO_ID:ref:...
+# Get prefix: gh api repos/OWNER/NAME/actions/oidc/customization/sub --jq .sub_claim_prefix
+variable "github_oidc_sub_prefix" {
+  type        = string
+  description = "Exact OIDC sub claim prefix from GitHub (immutable IDs)."
+  default     = "repo:kartikshelar@71000941/llm-serving-bench@1360824412"
+}
+
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
+  # Ignored for github.com (AWS trusts GitHub's CA); API still requires a value.
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
@@ -31,7 +41,7 @@ resource "aws_iam_role" "github_actions" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+          "token.actions.githubusercontent.com:sub" = "${var.github_oidc_sub_prefix}:*"
         }
       }
     }]

@@ -91,4 +91,15 @@ Local publish (same contract as CI):
 bash scripts/publish_ecr.sh latest
 ```
 
-Override trusted repo if needed: `github_repository = "owner/name"` in `terraform.tfvars`.
+OIDC trust uses GitHub’s **immutable** `sub` prefix (required for repos created
+after 2026-07-15). Confirm with:
+
+```powershell
+gh api repos/kartikshelar/llm-serving-bench/actions/oidc/customization/sub --jq .sub_claim_prefix
+```
+
+Override in `terraform.tfvars` if the prefix ever changes:
+
+```hcl
+github_oidc_sub_prefix = "repo:owner@OWNER_ID/name@REPO_ID"
+```
