@@ -25,23 +25,37 @@ into the table below.
 
 Kaggle T4 time is free for this project → **no $/M** (throughput only).
 
-## Results
+## Claimed result (headline)
 
-| hardware | instance | $/hr | rung | concurrency chosen | out tok/s (mean±SD) | $/M output tokens | claim? |
-|---|---|---:|---:|---:|---|---:|---|
-| aws_g4dn.xlarge | g4dn.xlarge spot | 0.2562 | 0 | 4 | 26.2 ± 0.0 | **2.72** | yes — baseline |
-| aws_g4dn.xlarge | g4dn.xlarge spot | 0.2562 | 1 | 32 | 472.0 ± 0.2 | **0.151** | yes — primary win |
-| aws_g4dn.xlarge | g4dn.xlarge spot | 0.2562 | 3 | 32 | 516.9 ± 2.3 | 0.138 | **no** — arithmetic only; prefix unproven (see findings) |
-| kaggle_t4_x1 | — | 0 | 0 | 4 | 19.7 ± 0.0 | n/a (free) | — |
-| kaggle_t4_x1 | — | 0 | 1 | 32 | 508.9 ± 1.7 | n/a (free) | — |
-| kaggle_t4_x1 | — | 0 | 2 | 32 | 440.6 ± 8.9 | n/a (free) | — |
-| kaggle_t4_x1 | — | 0 | 3 | 32 | 488.8 ± 4.5 | n/a (free) | — |
-| kaggle_t4_x2 | — | 0 | 4 | 32 | 241.7 ± 1.6 | n/a (free) | — |
+| hardware | rung | concurrency | out tok/s (mean±SD) | $/M output tokens |
+|---|---:|---:|---|---:|
+| aws_g4dn.xlarge | 0 HF | 4† | 26.2 ± 0.0 | 2.72 |
+| aws_g4dn.xlarge | 1 vLLM | 32 | 472.0 ± 0.2 | **0.151** |
 
-**Read:** on this spot price, moving from HF (rung 0) to vLLM (rung 1) drops
-cost per million output tokens by roughly **18×** ($2.72 → $0.151). That is the
-cost claim. Rung 3’s $0.138 is left in the table for completeness but is
-**not** a headline — Kaggle and AWS disagree on whether prefix beats rung 1
-([`docs/findings.md`](../docs/findings.md)).
+† HF throughput is flat across concurrency; c=4 is representative, not a peak.
+
+**Read:** vLLM cuts cost per million output tokens by roughly **18×** vs HF
+($2.72 → $0.151) at this spot price. **That is the cost claim.**
+
+## Unclaimed arithmetic (prefix cache)
+
+| hardware | rung | concurrency | out tok/s (mean±SD) | $/M output tokens |
+|---|---:|---:|---|---:|
+| aws_g4dn.xlarge | 3 prefix | 32 | 516.9 ± 2.3 | 0.138 |
+
+A further ~9% cheaper than rung 1 *if* the AWS prefix-cache result replicates
+under a controlled A/B with identical images and warm KV state — **which it
+has not** (on Kaggle, prefix was *lower* than rung 1; ranges did not overlap).
+See [`docs/findings.md`](../docs/findings.md). Do not resume-quote $0.138.
+
+## Kaggle (throughput only)
+
+| hardware | rung | concurrency | out tok/s (mean±SD) | $/M |
+|---|---:|---:|---|---|
+| kaggle_t4_x1 | 0 | flat 1–16 | ~19.6–19.7 ± ≤0.1 | n/a |
+| kaggle_t4_x1 | 1 | 32 | 508.9 ± 1.7 | n/a |
+| kaggle_t4_x1 | 2 | 32 | 440.6 ± 8.9 | n/a |
+| kaggle_t4_x1 | 3 | 32 | 488.8 ± 4.5 | n/a |
+| kaggle_t4_x2 | 4 | 32 | 241.7 ± 1.6 | n/a |
 
 Spot prices move; re-query before quoting these dollars elsewhere.

@@ -27,8 +27,10 @@ Model locked: `Qwen/Qwen2.5-3B-Instruct` (rung 2: `…-AWQ`). Accuracy not measu
 
 **Hardware:** `kaggle_t4_x1`, `aws_g4dn.xlarge`
 
-Throughput is essentially flat across concurrency (serial `generate`). Raising
-concurrency only inflates e2e latency.
+Throughput is essentially flat across concurrency (serial `generate`): about
+**19.6–19.7 tok/s** on Kaggle and **26.0–26.2 tok/s** on `aws_g4dn.xlarge`
+(SD ≪ 1). Raising concurrency only inflates e2e latency. The c=1 vs c=16 rows
+below are the same throughput story, not a “peak.”
 
 | hardware | c | out tok/s (mean±SD) | e2e p50 ms (mean±SD) |
 |---|---:|---|---|
@@ -41,6 +43,11 @@ concurrency only inflates e2e latency.
 those rows are all errors (still in the CSV). Valid AWS rung-0 numbers are the
 `--no-stream` re-run. At c=32, HF still showed timeouts/errors — no clean
 zero-error mean at that concurrency on AWS.
+
+**GPU util / mem / KV %:** CSV columns exist but are empty for every logged row
+(never sampled during these runs). The flat-vs-scaling contrast is therefore
+from throughput and latency only — serial `generate` vs continuous batching —
+not from utilization traces.
 
 ---
 
@@ -123,3 +130,11 @@ throughput of one. Gap ≫ within-rung SD. Matches the pre-registered
   capacity-optimized; compute destroyed after the session.
 - GHA OIDC → ECR → SSM image URI; GPU `user_data` pulls on boot.
 - Account budget actual ~$0.31 at write-up time (alarm $15 / ceiling $25).
+
+## Instrumentation gap (GPU util / memory / KV)
+
+The brief required `gpu_util_pct`, `gpu_mem_mb`, and `kv_cache_pct`. Those
+columns are in the CSV header, but **all 135 logged rows leave them blank** —
+the harness never wrote NVML or vLLM engine stats during Phase 1–3 runs.
+No utilization number is invented here. Re-instrumentation + a re-run would be
+needed before any util table belongs in this file.

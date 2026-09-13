@@ -29,18 +29,20 @@ dtype: **fp16** (T4 / GTX 1650 are cc 7.5; bf16 not properly supported).
 
 ## Results
 
-Peak sustainable **output** tok/s = concurrency that maximized mean throughput
-with zero errors. Hardware label on every row. Full sweep (c=1…32) in the CSV;
-dispersion detail in [`docs/findings.md`](docs/findings.md).
+For rungs that scale (1–4), the concurrency column is the argmax of mean
+output tok/s with zero errors. **Rung 0 does not scale** — throughput is flat
+across concurrency (~19.6–19.7 tok/s on Kaggle; ~26.0–26.2 on
+`aws_g4dn.xlarge`); those rows show a representative concurrency, not a peak.
+Full sweep and dispersion: [`docs/findings.md`](docs/findings.md).
 
 | hardware | rung | what | concurrency | out tok/s (mean±SD) | e2e p50 ms (mean±SD) |
 |---|---:|---|---:|---|---|
-| kaggle_t4_x1 | 0 | HF naive | 4 | 19.7 ± 0.0 | 27974 ± 52 |
+| kaggle_t4_x1 | 0 | HF naive (flat) | 1–16 | ~19.6–19.7 ± ≤0.1 | rises with c (see findings) |
 | kaggle_t4_x1 | 1 | vLLM | 32 | 508.9 ± 1.7 | 6613 ± 7 |
 | kaggle_t4_x1 | 2 | AWQ INT4 | 32 | 440.6 ± 8.9 | 7193 ± 76 |
 | kaggle_t4_x1 | 3 | prefix cache | 32 | 488.8 ± 4.5 | 6599 ± 14 |
 | kaggle_t4_x2 | 4 | TP=2 | 32 | 241.7 ± 1.6 | 12782 ± 231 |
-| aws_g4dn.xlarge | 0 | HF naive | 4 | 26.2 ± 0.0 | 20948 ± 55 |
+| aws_g4dn.xlarge | 0 | HF naive (flat) | 1–16 | ~26.0–26.2 ± ≤0.1 | rises with c (see findings) |
 | aws_g4dn.xlarge | 1 | vLLM | 32 | 472.0 ± 0.2 | 6976 ± 6 |
 | aws_g4dn.xlarge | 3 | prefix cache | 32 | 516.9 ± 2.3 | 6306 ± 235 |
 
@@ -70,17 +72,19 @@ Written **before** any Kaggle or AWS run.
 Price: **$0.2562/hr** `g4dn.xlarge` Linux/UNIX spot, `us-west-2b`,
 2026-09-12T15:00Z (`describe-spot-price-history`).
 
-Claimed cost story is HF → vLLM only. Rung 3 is omitted here on purpose:
-findings treat prefix cache as unproven (Kaggle/AWS disagree); see
-[`docs/findings.md`](docs/findings.md). Raw rung-3 arithmetic lives in
-[`results/cost_model.md`](results/cost_model.md) with the same caveat.
+**Headline:** rung 1 (vLLM) at **$0.151 / M output tokens** — about an **18×**
+reduction from the HF baseline ($2.72 / M) on the same spot price.
 
 | hardware | rung | out tok/s (mean±SD) | $/M output tokens |
 |---|---:|---|---:|
-| aws_g4dn.xlarge | 0 | 26.2 ± 0.0 | **2.72** |
-| aws_g4dn.xlarge | 1 | 472.0 ± 0.2 | **0.151** |
+| aws_g4dn.xlarge | 0 HF | 26.2 ± 0.0 | 2.72 |
+| aws_g4dn.xlarge | 1 vLLM | 472.0 ± 0.2 | **0.151** |
 
-Method: [`results/cost_model.md`](results/cost_model.md). Kaggle is free → no $/M.
+Footnote: rung 3 arithmetic is ~$0.138 / M (~9% cheaper than rung 1) *if* the
+AWS prefix-cache result were to replicate under a controlled A/B — **which it
+has not** (Kaggle went the other way). Do not quote $0.138 as a claimed cost.
+Detail: [`results/cost_model.md`](results/cost_model.md) ·
+[`docs/findings.md`](docs/findings.md). Kaggle is free → no $/M.
 
 ---
 
@@ -111,6 +115,11 @@ Equal billing with wins. Detail in [`docs/findings.md`](docs/findings.md).
 - **Multi-node serving** — out of scope
 - **Production traffic / real users** — this is a benchmark harness
 - **AWS rungs 2 and 4** — Phase 3 ran a reduced ladder (0/1/3) under the $25 ceiling
+- **GPU util / GPU memory / KV cache %** — columns exist in `benchmarks.csv` but
+  every measured row left them empty (harness never sampled NVML / vLLM metrics
+  during the logged runs). HF-flat vs vLLM-scale is inferred from throughput and
+  latency only, not from utilization traces. Filling those columns would need a
+  re-run; inventing values is forbidden.
 
 ---
 
@@ -167,7 +176,11 @@ Hard ceiling **$25**, alarm **$15**, spot only, no NAT. Deploy pipeline:
 
 ---
 
-## License / budget
+## License
 
-AWS hard ceiling **$25**. Spot only, public subnet only, destroy every session.
+MIT — see [`LICENSE`](LICENSE).
+
+## Budget (AWS)
+
+Hard ceiling **$25**. Spot only, public subnet only, destroy every session.
 No NAT Gateway.
