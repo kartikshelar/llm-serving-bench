@@ -72,33 +72,52 @@ AWS cold start (container → `/health`): **206 s** — **single observation (n=
 | AWQ | 32 | 440.6 | 8.9 | 433.4 | 450.6 |
 | rung 1 fp16 | 32 | 508.9 | 1.7 | 507.6 | 510.9 |
 
-**Negative result:** AWQ slower than fp16; c=32 ranges do not overlap. Accuracy
+**Negative result (Phase 2 ladder):** AWQ slower than fp16 across the full
+concurrency sweep; at c=32 ranges do not overlap (440.6 vs 508.9). Accuracy
 not evaluated.
 
-### Why c=1 hurts most (hypothesis — not yet measured)
+### Why c=1 hurt in Phase 2 (hypothesis → tested)
 
-At concurrency 1, decode is memory-bandwidth-bound. INT4 weights *should* move
-fewer bytes. Losing ~38% (22.0 vs 35.3 mean tok/s) is the opposite of that
-textbook. Leading hypothesis: the AWQ path **dequantizes to fp16 before the
-matmul**, so you pay dequant every step and never keep INT4 through the
-arithmetic — same *shape* as SourceBound’s onnxruntime fp16→fp32 on CPU.
+At concurrency 1, decode is memory-bandwidth-bound. INT4 *should* help if
+narrow weights stay in the matmul. Phase 2 lost ~38% there (22.0 vs 35.3).
+Leading hypothesis was dequant-to-fp16 before GEMM (same *shape* as SourceBound
+fp16→fp32 on CPU).
 
-**Do not treat that as confirmed.** Protocol to test it (one Kaggle T4 session):
-[`docs/awq_diag.md`](awq_diag.md) / `bash scripts/kaggle_awq_diag.sh`.
+### AWQ diagnostic results (`AWQ_DIAG`, 2026-09-13, `kaggle_t4_x1`)
 
-### AWQ diagnostic results
+Protocol: [`docs/awq_diag.md`](awq_diag.md). vLLM **0.29.0** (see
+`results/awq_kernel_inspect.txt`). c=1, n=3, `errors=0`, `--sample-gpu`.
+`max_tokens` asked ∈ {64, 256, 1024}.
 
-_Pending Kaggle run. Rows will be tagged `AWQ_DIAG` in `results/benchmarks.csv`
-with `max_tokens` ∈ {64, 256, 1024}, c=1, n=3, plus `gpu_util_pct` /
-`gpu_mem_mb` from `--sample-gpu`. Fill this subsection only from those rows._
+| max_tokens | fp16 mean | std | min | max | AWQ mean | std | min | max | AWQ/fp16 | fp16 util% | AWQ util% |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 64 | 30.9 | 6.1 | 24.3 | 36.5 | 76.1 | 1.4 | 75.3 | 77.7 | **2.46×** | 96.1 | 93.6 |
+| 256 | 26.1 | 1.0 | 24.9 | 26.9 | 77.0 | 3.0 | 73.6 | 79.3 | **2.95×** | 98.7 | 98.2 |
+| 1024 | 25.9 | 0.8 | 24.9 | 26.5 | 76.5 | 3.8 | 72.3 | 79.4 | **2.96×** | 99.6 | 98.7 |
 
-| max_tokens | fp16 mean±SD | AWQ mean±SD | AWQ/fp16 | gpu util notes |
-|---:|---|---|---:|---|
-| 64 | _pending_ | _pending_ | | |
-| 256 | _pending_ | _pending_ | | |
-| 1024 | _pending_ | _pending_ | | |
+GPU mem (mean): fp16 ~13.0–13.7 GB; AWQ ~13.3–13.6 GB.
 
-Kernel inspect log: `results/awq_kernel_inspect.txt` (after the session).
+**What this does and does not support**
+
+1. **Dequant-amortization hypothesis: not supported here.** On this stack AWQ
+   is *faster* at c=1 at every `max_tokens`, not slower. GPU util is high for
+   both (~94–100%) — not an idle-AWQ story.
+2. **Length sweep did not really lengthen decode.** e2e p50 for fp16 is ~5.3 s
+   at both 256 and 1024; AWQ ~2.0 s at both. This RAG workload hits EOS early,
+   so raising `max_tokens` did not buy longer decode to amortize anything.
+3. **Phase 2 c=1 loss (22.0 vs 35.3) remains a real logged result** for that
+   session. It does **not** reproduce on vLLM 0.29.0. Kernel inspect could not
+   import classic `awq` / `awq_marlin` modules (only `awq_triton` symbols
+   present) — treat the Phase 2 vs diag flip as **environment / kernel-path
+   dependent**, not as “AWQ is always slower” or “always faster.”
+4. **Do not silently rewrite the Phase 2 ladder.** High-concurrency Phase 2
+   rows still show AWQ behind fp16 at c=32 (440.6 vs 508.9). This diagnostic
+   only re-measured **c=1**.
+
+**Interview framing:** the interesting claim is the *trap pattern* (quant only
+pays if the kernel keeps the narrow dtype) plus honest evidence that on one T4
+stack AWQ lost at c=1 and on a later vLLM 0.29 stack it won ~3× at c=1 — so
+name the stack when you quote either number.
 
 ---
 

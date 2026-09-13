@@ -87,11 +87,12 @@ want the unclaimed arithmetic. Kaggle is free → no $/M.
 
 Equal billing with wins. Detail in [`docs/findings.md`](docs/findings.md).
 
-1. **AWQ (rung 2)** — expected a throughput or memory win; measured **lower**
-   tok/s than fp16 vLLM on the same Kaggle T4 (440.6±8.9 vs 508.9±1.7). At c=1
-   the loss is ~38% where INT4 should help most — diagnostic protocol in
-   [`docs/awq_diag.md`](docs/awq_diag.md) (pending Kaggle run). Accuracy not
-   measured.
+1. **AWQ (rung 2)** — Phase 2 ladder: slower than fp16 on Kaggle T4 (e.g. c=32
+   440.6±8.9 vs 508.9±1.7; c=1 22.0 vs 35.3). Follow-up `AWQ_DIAG` on vLLM
+   0.29.0 at c=1: AWQ **faster** (~76 vs ~26–31 tok/s). Dequant-amortization
+   hypothesis not supported by the diag session; Phase 2 loss looks
+   stack/kernel-path specific. Detail: [`docs/findings.md`](docs/findings.md).
+   Accuracy not measured.
 2. **Prefix caching (rung 3)** — shared system+retrieval framing should have
    helped. With dispersion reported: Kaggle ranges favor rung 1; AWS ranges
    favor prefix. Opposite platforms without a controlled A/B → not a resume win.

@@ -1,0 +1,15 @@
+=== AWQ / vLLM kernel inspection (no benchmark numbers) ===
+python=3.12.13
+vllm=0.29.0
+  import vllm.model_executor.layers.quantization.awq: FAIL (No module named 'vllm.model_executor.layers.quantization.awq')
+  import vllm.model_executor.layers.quantization.awq_marlin: FAIL (No module named 'vllm.model_executor.layers.quantization.awq_marlin')
+  vllm.model_executor.layers.quantization.awq_triton: ['AWQ_TRITON_SUPPORTED_GROUP_SIZES']
+  vllm.model_executor.layers.linear: ['ColumnParallelLinear', 'DCPGroupColumnParallelLinear', 'KimiK3MergedQKVGateLinear', 'LinearBase', 'LinearMethodBase', 'MergedColumnParallelLinear', 'MinimaxM3QKVParallelLinearWithIndexer', 'QKVParallelLinear', 'ReplicatedLinear', 'RowParallelLinear', 'UnquantizedLinearMethod']
+AWQConfig probe: No module named 'vllm.model_executor.layers.quantization.awq'
+
+Interpretation guide (not a measurement):
+- If the active path is Marlin/INT4 GEMM keeping narrow weights in the
+  matmul, short decode at c=1 should not lose badly to fp16.
+- If the path dequantizes to fp16/fp32 then calls a dense GEMM, c=1
+  short outputs can lose to fp16 (dequant tax not amortized).
+Confirm only with tok/s rows in results/benchmarks.csv.

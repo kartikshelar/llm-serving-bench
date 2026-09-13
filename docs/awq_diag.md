@@ -47,6 +47,13 @@ Also writes `results/awq_kernel_inspect.txt` (module classes only — not tok/s)
 | Inspect log shows Marlin INT4 GEMM | Narrow arithmetic present — then dig into why c=1 still loses |
 | Inspect log shows dense fp16 after dequant | Matches the hypothesized trap |
 
+## Results (filled 2026-09-13)
+
+See [`docs/findings.md`](findings.md) § AWQ diagnostic. Short version: on
+vLLM 0.29.0, AWQ beat fp16 at c=1 (~2.5–3×) for all three `max_tokens` settings;
+`max_tokens` 256 vs 1024 did not lengthen e2e (EOS). Phase 2 ladder c=1 loss
+did not reproduce.
+
 ## Download
 
 Copy `results/benchmarks.csv` (and `awq_kernel_inspect.txt`) out of Kaggle, then
