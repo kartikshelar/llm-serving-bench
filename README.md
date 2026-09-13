@@ -180,5 +180,16 @@ MIT — see [`LICENSE`](LICENSE).
 
 ## Budget (AWS)
 
-Hard ceiling **$25**. Spot only, public subnet only, destroy every session.
-No NAT Gateway.
+Hard ceiling **$25**. Alarm **$15**. Spot only, public subnet only, no NAT.
+Full stack destroyed **2026-09-13** after Phase 3/4 (no live VPC/ECR/GPU).
+
+| as-of (UTC-7) | source | actual spend | notes |
+|---|---|---:|---|
+| 2026-09-12 | AWS Budgets `llm-serving-bench-monthly` | **$0.314** | early; Cost Explorer still lagged |
+| 2026-09-13 | AWS Budgets `llm-serving-bench-monthly` | **$1.249** | lag caught up; still under $15 / $25 |
+| 2026-09-13 | post-`terraform destroy` | — | EC2/ALB/NAT/EIP/ECR/VPC/OIDC gone |
+
+Cost Explorer often trails Budgets by a day+; Budgets `ActualSpend` is the
+figure used here. Billing may still settle a few cents after destroy.
+Per-token serving cost (separate from project total):
+[`results/cost_model.md`](results/cost_model.md).

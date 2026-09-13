@@ -1,3 +1,12 @@
+## Status (post Phase 4)
+
+**Live AWS stack: destroyed 2026-09-13.** Portfolio evidence is the Terraform
+*code* in this directory plus measured rows in `results/benchmarks.csv`.
+Re-`apply` only for a new timed session. Account budget actual at destroy
+window: **$1.249** (AWS Budgets; see README / `results/cost_model.md`).
+
+---
+
 # Terraform (Phase 3)
 
 **Hard ceiling: $25 total. Alarm: $15. Spot only. No NAT. Destroy every session.**

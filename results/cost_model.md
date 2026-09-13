@@ -55,3 +55,17 @@ Not a resume figure. Kaggle prefix was *slower* than rung 1.
 | kaggle_t4_x2 | 4 | 32 | 241.7 | 1.6 | 240.0 | 243.1 |
 
 Spot prices move; re-query before quoting dollars elsewhere.
+
+## Project total spend (account budget)
+
+Not $/M tokens — this is **what the AWS account actually billed** for the
+project window, from AWS Budgets (Cost Explorer lagged behind).
+
+| as-of | source | actual | ceiling | alarm |
+|---|---|---:|---:|---:|
+| 2026-09-12 | Budgets `llm-serving-bench-monthly` | $0.314 | $25 | $15 |
+| 2026-09-13 | Budgets `llm-serving-bench-monthly` | **$1.249** | $25 | $15 |
+
+Stack fully destroyed 2026-09-13 (`terraform destroy` + orphan probe cleanup).
+GitHub does not depend on any live AWS resources.
+
