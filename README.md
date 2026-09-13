@@ -9,8 +9,9 @@ tensor parallelism).
 different model here means those figures do not transfer. This repo never
 imports or restates SourceBound accuracy numbers.
 
-**Status:** Phase 4 complete. All figures below are means of three
-`errors=0` repeats from [`results/benchmarks.csv`](results/benchmarks.csv).
+**Status:** Phase 4 complete. Throughput figures are mean ± sample SD over
+n=3 `errors=0` repeats from [`results/benchmarks.csv`](results/benchmarks.csv)
+unless noted otherwise.
 
 ---
 
@@ -29,20 +30,22 @@ dtype: **fp16** (T4 / GTX 1650 are cc 7.5; bf16 not properly supported).
 ## Results
 
 Peak sustainable **output** tok/s = concurrency that maximized mean throughput
-with zero errors. Hardware label on every row. Full sweep (c=1…32) in the CSV.
+with zero errors. Hardware label on every row. Full sweep (c=1…32) in the CSV;
+dispersion detail in [`docs/findings.md`](docs/findings.md).
 
-| hardware | rung | what | concurrency | mean out tok/s | mean e2e p50 (ms) |
-|---|---:|---|---:|---:|---:|
-| kaggle_t4_x1 | 0 | HF naive | 4 | 19.7 | 27974 |
-| kaggle_t4_x1 | 1 | vLLM | 32 | 509.0 | 6613 |
-| kaggle_t4_x1 | 2 | AWQ INT4 | 32 | 440.6 | 7193 |
-| kaggle_t4_x1 | 3 | prefix cache | 32 | 488.8 | 6599 |
-| kaggle_t4_x2 | 4 | TP=2 | 32 | 241.7 | 12782 |
-| aws_g4dn.xlarge | 0 | HF naive | 4 | 26.2 | 20948 |
-| aws_g4dn.xlarge | 1 | vLLM | 32 | 472.0 | 6976 |
-| aws_g4dn.xlarge | 3 | prefix cache | 32 | 516.9 | 6306 |
+| hardware | rung | what | concurrency | out tok/s (mean±SD) | e2e p50 ms (mean±SD) |
+|---|---:|---|---:|---|---|
+| kaggle_t4_x1 | 0 | HF naive | 4 | 19.7 ± 0.0 | 27974 ± 52 |
+| kaggle_t4_x1 | 1 | vLLM | 32 | 508.9 ± 1.7 | 6613 ± 7 |
+| kaggle_t4_x1 | 2 | AWQ INT4 | 32 | 440.6 ± 8.9 | 7193 ± 76 |
+| kaggle_t4_x1 | 3 | prefix cache | 32 | 488.8 ± 4.5 | 6599 ± 14 |
+| kaggle_t4_x2 | 4 | TP=2 | 32 | 241.7 ± 1.6 | 12782 ± 231 |
+| aws_g4dn.xlarge | 0 | HF naive | 4 | 26.2 ± 0.0 | 20948 ± 55 |
+| aws_g4dn.xlarge | 1 | vLLM | 32 | 472.0 ± 0.2 | 6976 ± 6 |
+| aws_g4dn.xlarge | 3 | prefix cache | 32 | 516.9 ± 2.3 | 6306 ± 235 |
 
-AWS cold start (container → `/health`): **206 s** (CSV notes, Phase 3 session).
+AWS cold start (container → `/health`): **206 s** — **single observation (n=1)**,
+CSV notes, Phase 3 session.
 
 See also: [cost model](results/cost_model.md) · [findings](docs/findings.md)
 
@@ -54,11 +57,11 @@ Written **before** any Kaggle or AWS run.
 
 | Rung | Prediction | What happened |
 |---|---|---|
-| 0 HF `generate` | Slowest baseline | Confirmed — flat ~20–26 tok/s, latency explodes with concurrency. |
-| 1 vLLM batching | Large gain vs 0 at c≥8 | Confirmed — ~25× throughput vs HF at peak on T4. |
-| 2 AWQ INT4 | Moderate throughput win | **Miss** — slower than fp16 vLLM (~441 vs ~509 tok/s). |
-| 3 Prefix cache | Should help shared RAG prefix | **Mostly miss** — no win on Kaggle; small AWS-only bump at c=32. |
-| 4 TP=2 on 2×T4 | Likely disappointing (PCIe) | Confirmed — ~242 tok/s, ~half of single-GPU vLLM. |
+| 0 HF `generate` | Slowest baseline | Confirmed — flat ~20–26 tok/s (SD ≪ 1), latency explodes with concurrency. |
+| 1 vLLM batching | Large gain vs 0 at c≥8 | Confirmed — 508.9±1.7 vs ~20 HF at peak on T4. |
+| 2 AWQ INT4 | Moderate throughput win | **Miss** — 440.6±8.9 vs 508.9±1.7; repeat ranges do not overlap. |
+| 3 Prefix cache | Should help shared RAG prefix | **Inconclusive** — Kaggle prefix *lower* (ranges no overlap); AWS prefix *higher* (ranges no overlap). Opposite directions → not a claimed win. |
+| 4 TP=2 on 2×T4 | Likely disappointing (PCIe) | Confirmed — 241.7±1.6 vs 508.9±1.7 (~half). |
 
 ---
 
@@ -67,13 +70,17 @@ Written **before** any Kaggle or AWS run.
 Price: **$0.2562/hr** `g4dn.xlarge` Linux/UNIX spot, `us-west-2b`,
 2026-09-12T15:00Z (`describe-spot-price-history`).
 
-| hardware | rung | mean out tok/s | $/M output tokens |
-|---|---:|---:|---:|
-| aws_g4dn.xlarge | 0 | 26.2 | **2.72** |
-| aws_g4dn.xlarge | 1 | 472.0 | **0.151** |
-| aws_g4dn.xlarge | 3 | 516.9 | **0.138** |
+Claimed cost story is HF → vLLM only. Rung 3 is omitted here on purpose:
+findings treat prefix cache as unproven (Kaggle/AWS disagree); see
+[`docs/findings.md`](docs/findings.md). Raw rung-3 arithmetic lives in
+[`results/cost_model.md`](results/cost_model.md) with the same caveat.
 
-Method and caveats: [`results/cost_model.md`](results/cost_model.md). Kaggle is free → no $/M.
+| hardware | rung | out tok/s (mean±SD) | $/M output tokens |
+|---|---:|---|---:|
+| aws_g4dn.xlarge | 0 | 26.2 ± 0.0 | **2.72** |
+| aws_g4dn.xlarge | 1 | 472.0 ± 0.2 | **0.151** |
+
+Method: [`results/cost_model.md`](results/cost_model.md). Kaggle is free → no $/M.
 
 ---
 
@@ -82,14 +89,13 @@ Method and caveats: [`results/cost_model.md`](results/cost_model.md). Kaggle is 
 Equal billing with wins. Detail in [`docs/findings.md`](docs/findings.md).
 
 1. **AWQ (rung 2)** — expected a throughput or memory win; measured **lower**
-   tok/s than fp16 vLLM on the same Kaggle T4 at every concurrency. Accuracy
+   tok/s than fp16 vLLM on the same Kaggle T4 (440.6±8.9 vs 508.9±1.7). Accuracy
    not measured; do not spin this as “better, just slower.”
 2. **Prefix caching (rung 3)** — shared system+retrieval framing should have
-   helped. On Kaggle it did not beat rung 1; on AWS the gain is small and
-   concurrency-specific. Not a clean optimization story.
+   helped. With dispersion reported: Kaggle ranges favor rung 1; AWS ranges
+   favor prefix. Opposite platforms without a controlled A/B → not a resume win.
 3. **Tensor parallelism on 2×T4 (rung 4)** — PCIe interconnect tax dominated.
-   Two GPUs ≈ half the throughput of one. Pre-registered as likely; still a
-   first-class negative result.
+   Two GPUs ≈ half the throughput of one (241.7±1.6 vs 508.9±1.7).
 4. **HF streaming on AWS** — first Phase 3 HF sweep was all errors (server
    rejects stream). Valid numbers required `--no-stream`. Rows with errors
    remain in the CSV on purpose.

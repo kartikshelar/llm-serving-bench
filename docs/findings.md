@@ -1,8 +1,11 @@
 # Findings
 
 Per-rung analysis against pre-registered predictions in the README.
-Every throughput figure below is a **mean of three repeats** with `errors=0`
-from `results/benchmarks.csv`. Negative results get equal space.
+
+Every throughput figure is mean ± sample standard deviation over **n=3**
+`errors=0` repeats from `results/benchmarks.csv` (Bessel-corrected SD).
+Where a comparison is close, ranges `[min, max]` of the three repeats are
+stated explicitly.
 
 Model locked: `Qwen/Qwen2.5-3B-Instruct` (rung 2: `…-AWQ`). Accuracy not measured.
 
@@ -12,11 +15,11 @@ Model locked: `Qwen/Qwen2.5-3B-Instruct` (rung 2: `…-AWQ`). Accuracy not measu
 
 | Rung | Prediction | Outcome |
 |---|---|---|
-| 0 HF naive | Slowest baseline | **Confirmed.** Flat ~20 tok/s on Kaggle T4, ~26 tok/s on `aws_g4dn.xlarge`; does not scale with concurrency. |
-| 1 vLLM | Large gain vs 0 at concurrency ≥8 | **Confirmed.** Peak ~509 tok/s (`kaggle_t4_x1`, c=32) vs ~20 tok/s HF; ~472 tok/s on `aws_g4dn.xlarge`. |
-| 2 AWQ INT4 | Moderate throughput / memory win | **Falsified on throughput.** Peak ~441 tok/s vs ~509 for fp16 vLLM on the same T4 — **slower**, not faster. Memory/accuracy not claimed here. |
-| 3 Prefix cache | Should help (shared system+retrieval framing) | **Mixed / mostly null.** On Kaggle: peak ~489 vs ~509 for rung 1 (no win). On AWS: peak ~517 vs ~472 (small win at c=32 only). Not a clear win on this workload. |
-| 4 TP=2 | Uncertain / likely disappointing (PCIe) | **Confirmed disappointing.** Peak ~242 tok/s on `kaggle_t4_x2` — about **half** single-T4 vLLM. |
+| 0 HF naive | Slowest baseline | **Confirmed.** Flat ~20 tok/s on Kaggle T4, ~26 on `aws_g4dn.xlarge`; does not scale with concurrency (SD ≪ 1 tok/s). |
+| 1 vLLM | Large gain vs 0 at concurrency ≥8 | **Confirmed.** Peak 508.9±1.7 tok/s (`kaggle_t4_x1`, c=32) vs ~20 HF; 472.0±0.2 on `aws_g4dn.xlarge`. |
+| 2 AWQ INT4 | Moderate throughput / memory win | **Falsified on throughput.** 440.6±8.9 vs 508.9±1.7 fp16 vLLM on the same T4 — gap ≫ within-rung SD. Memory/accuracy not claimed. |
+| 3 Prefix cache | Should help (shared system+retrieval framing) | **Inconclusive / not a claimed win.** Kaggle c=32: 488.8±4.5 vs 508.9±1.7 (ranges `[486.1, 494.0]` vs `[507.6, 510.9]` — no overlap, prefix *lower*). AWS c=32: 516.9±2.3 vs 472.0±0.2 (ranges do not overlap, prefix *higher*). Opposite directions across platforms without a controlled A/B → do not treat as a resume win. |
+| 4 TP=2 | Uncertain / likely disappointing (PCIe) | **Confirmed disappointing.** 241.7±1.6 on `kaggle_t4_x2` vs 508.9±1.7 single-T4 vLLM — about half. |
 
 ---
 
@@ -27,12 +30,12 @@ Model locked: `Qwen/Qwen2.5-3B-Instruct` (rung 2: `…-AWQ`). Accuracy not measu
 Throughput is essentially flat across concurrency (serial `generate`). Raising
 concurrency only inflates e2e latency.
 
-| hardware | c | mean out tok/s | mean e2e p50 (ms) |
-|---|---:|---:|---:|
-| kaggle_t4_x1 | 1 | 19.6 | 7502 |
-| kaggle_t4_x1 | 16 | 19.6 | 105810 |
-| aws_g4dn.xlarge | 1 | 26.0 | 5623 |
-| aws_g4dn.xlarge | 16 | 26.2 | 79249 |
+| hardware | c | out tok/s (mean±SD) | e2e p50 ms (mean±SD) |
+|---|---:|---|---|
+| kaggle_t4_x1 | 1 | 19.6 ± 0.1 | 7502 ± 55 |
+| kaggle_t4_x1 | 16 | 19.6 ± 0.0 | 105810 ± 414 |
+| aws_g4dn.xlarge | 1 | 26.0 ± 0.1 | 5623 ± 22 |
+| aws_g4dn.xlarge | 16 | 26.2 ± 0.0 | 79249 ± 507 |
 
 **AWS note:** first AWS HF pass used streaming; the HF server rejects stream and
 those rows are all errors (still in the CSV). Valid AWS rung-0 numbers are the
@@ -48,16 +51,16 @@ zero-error mean at that concurrency on AWS.
 This is the rung that worked. Continuous batching scales with concurrency;
 TTFT stays in the low hundreds of ms while aggregate output tok/s rises.
 
-| hardware | c | mean out tok/s | mean e2e p50 (ms) | mean ttft p50 (ms) |
-|---|---:|---:|---:|---:|
-| kaggle_t4_x1 | 1 | 35.3 | 3923 | 67 |
-| kaggle_t4_x1 | 32 | 509.0 | 6613 | 146 |
-| aws_g4dn.xlarge | 1 | 34.8 | 4096 | 106 |
-| aws_g4dn.xlarge | 32 | 472.0 | 6976 | 320 |
+| hardware | c | out tok/s (mean±SD) | e2e p50 ms (mean±SD) | ttft p50 ms (mean±SD) |
+|---|---:|---|---|---|
+| kaggle_t4_x1 | 1 | 35.3 ± 1.4 | 3923 ± 211 | 66.5 ± 4.8 |
+| kaggle_t4_x1 | 32 | 508.9 ± 1.7 | 6613 ± 7 | 146.3 ± 0.8 |
+| aws_g4dn.xlarge | 1 | 34.8 ± 0.1 | 4096 ± 13 | 106.1 ± 0.1 |
+| aws_g4dn.xlarge | 32 | 472.0 ± 0.2 | 6976 ± 6 | 319.9 ± 4.1 |
 
-AWS cold start (container start → `/health`): **206 s** (logged in rung-1 CSV
-notes for the Phase 3 session). Same GPU class (T4) as Kaggle; absolute tok/s
-is in the same ballpark, not identical session-to-session.
+AWS cold start (container start → `/health`): **206 s** — **single observation**
+(n=1), logged in rung-1 CSV notes for the Phase 3 session. Worth reporting;
+not a distribution.
 
 ---
 
@@ -66,16 +69,16 @@ is in the same ballpark, not identical session-to-session.
 **Hardware:** `kaggle_t4_x1` only (not repeated on AWS; Phase 3 reduced ladder
 was rungs 0/1/3).
 
-| c | mean out tok/s (AWQ) | mean out tok/s (rung 1 fp16) |
-|---:|---:|---:|
-| 1 | 22.0 | 35.3 |
-| 32 | 440.6 | 509.0 |
+| c | AWQ out tok/s (mean±SD) | rung 1 fp16 (mean±SD) |
+|---:|---|---|
+| 1 | 22.0 ± 0.0 | 35.3 ± 1.4 |
+| 32 | 440.6 ± 8.9 `[433.4, 450.6]` | 508.9 ± 1.7 `[507.6, 510.9]` |
 
 **Why this is a negative result:** INT4 was expected to help throughput or at
 least not hurt it on a memory-bound decode path. On this long-prompt /
 short-output RAG fixture with vLLM, AWQ underperformed fp16 at every measured
-concurrency. Accuracy was **not** evaluated — do not infer quality from these
-rows.
+concurrency. At c=32 the repeat ranges do not overlap. Accuracy was **not**
+evaluated — do not infer quality from these rows.
 
 ---
 
@@ -83,16 +86,18 @@ rows.
 
 **Hardware:** `kaggle_t4_x1`, `aws_g4dn.xlarge`
 
-| hardware | c | mean out tok/s (prefix) | mean out tok/s (rung 1) |
-|---|---:|---:|---:|
-| kaggle_t4_x1 | 32 | 488.8 | 509.0 |
-| aws_g4dn.xlarge | 32 | 516.9 | 472.0 |
+| hardware | c | prefix out tok/s (mean±SD) | rung 1 out tok/s (mean±SD) |
+|---|---:|---|---|
+| kaggle_t4_x1 | 32 | 488.8 ± 4.5 `[486.1, 494.0]` | 508.9 ± 1.7 `[507.6, 510.9]` |
+| aws_g4dn.xlarge | 32 | 516.9 ± 2.3 `[515.3, 519.6]` | 472.0 ± 0.2 `[471.7, 472.2]` |
 
-**Why this is mostly a negative / null result:** the shared prefix hypothesis
-was reasonable for RAG, but Kaggle showed no benefit versus rung 1. AWS showed
-a modest gain at high concurrency only. Treat prefix cache as unproven for
-this workload until a controlled A/B with identical images and warm KV state
-is re-run — not as a resume win.
+**How to read the dispersion:** on Kaggle the ~4% mean gap is larger than either
+within-config SD, and the three-repeat ranges do not overlap — so “prefix did
+not beat rung 1 on this Kaggle session” is supportable. On AWS the ranges also
+do not overlap, but in the **opposite** direction. That platform split, without
+identical images / warm-KV A/B, is why prefix cache stays **unproven** as an
+optimization claim — not because the means were reported without error bars.
+Do not put rung-3 $/M in a resume headline.
 
 ---
 
@@ -100,14 +105,15 @@ is re-run — not as a resume win.
 
 **Hardware:** `kaggle_t4_x2` (PCIe, not NVLink)
 
-| c | mean out tok/s (TP=2) | mean out tok/s (1×T4 rung 1) |
-|---:|---:|---:|
-| 1 | 12.7 | 35.3 |
-| 32 | 241.7 | 509.0 |
+| c | TP=2 out tok/s (mean±SD) | 1×T4 rung 1 (mean±SD) |
+|---:|---|---|
+| 1 | 12.7 ± 0.2 | 35.3 ± 1.4 |
+| 32 | 241.7 ± 1.6 `[240.0, 243.1]` | 508.9 ± 1.7 `[507.6, 510.9]` |
 
 **Why this failed:** for a 3B model the communication overhead of TP across
 PCIe dominates any parallel matmul win. Two GPUs delivered about half the
-throughput of one. Matches the pre-registered “likely disappointing” call.
+throughput of one. Gap ≫ within-rung SD. Matches the pre-registered
+“likely disappointing” call.
 
 ---
 
