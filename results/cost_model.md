@@ -9,13 +9,9 @@ spot price. No figure without a CSV row and a price source.
 $/M output tokens = (instance_usd_per_hour / output_tokens_per_sec / 3600) * 1e6
 ```
 
-Throughput = mean of three `errors=0` repeats at the concurrency that
-maximizes output tok/s for that hardware×rung (see `docs/findings.md`).
-Dispersion (sample SD) is shown next to tok/s; $/M uses the mean only.
+$/M uses the **mean** tok/s (n=3, `errors=0`). Spread is shown beside it.
 
-This model prices **GPU instance hours only**. It excludes ALB, EBS, ECR
-storage, and idle VPC — those matter for a live session but are not amortized
-into the table below.
+This model prices **GPU instance hours only** (excludes ALB, EBS, ECR, idle VPC).
 
 ## Price source
 
@@ -23,39 +19,39 @@ into the table below.
 |---|---|---|---:|---|---|
 | g4dn.xlarge | us-west-2b | Linux/UNIX spot | **0.2562** | `aws ec2 describe-spot-price-history` | 2026-09-12T15:00:00Z |
 
-Kaggle T4 time is free for this project → **no $/M** (throughput only).
+## Claimed cost (lead with this)
 
-## Claimed result (headline)
+**$0.151 / M output tokens** — rung 1 vLLM on `aws_g4dn.xlarge`.
 
-| hardware | rung | concurrency | out tok/s (mean±SD) | $/M output tokens |
-|---|---:|---:|---|---:|
-| aws_g4dn.xlarge | 0 HF | 4† | 26.2 ± 0.0 | 2.72 |
-| aws_g4dn.xlarge | 1 vLLM | 32 | 472.0 ± 0.2 | **0.151** |
+| hardware | rung | c | mean | std | min | max | $/M |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| aws_g4dn.xlarge | **1 vLLM** | 32 | 472.0 | 0.2 | 471.7 | 472.2 | **0.151** |
+| aws_g4dn.xlarge | 0 HF† | 4 | 26.2 | 0.0 | 26.2 | 26.2 | 2.72 |
 
-† HF throughput is flat across concurrency; c=4 is representative, not a peak.
+† HF is flat across concurrency; c=4 is representative, not a peak.
 
-**Read:** vLLM cuts cost per million output tokens by roughly **18×** vs HF
-($2.72 → $0.151) at this spot price. **That is the cost claim.**
+**~18×** cheaper than HF at this spot price. **That is the only cost claim.**
 
-## Unclaimed arithmetic (prefix cache)
+## Unclaimed (prefix cache) — do not headline
 
-| hardware | rung | concurrency | out tok/s (mean±SD) | $/M output tokens |
-|---|---:|---:|---|---:|
-| aws_g4dn.xlarge | 3 prefix | 32 | 516.9 ± 2.3 | 0.138 |
+Prefix is **unproven** on this workload ([`docs/findings.md`](../docs/findings.md)).
+Arithmetic only, if the AWS session somehow replicated:
 
-A further ~9% cheaper than rung 1 *if* the AWS prefix-cache result replicates
-under a controlled A/B with identical images and warm KV state — **which it
-has not** (on Kaggle, prefix was *lower* than rung 1; ranges did not overlap).
-See [`docs/findings.md`](../docs/findings.md). Do not resume-quote $0.138.
+| hardware | rung | c | mean | std | min | max | $/M |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| aws_g4dn.xlarge | 3 | 32 | 516.9 | 2.3 | 515.3 | 519.6 | 0.138 |
 
-## Kaggle (throughput only)
+Not a resume figure. Kaggle prefix was *slower* than rung 1.
 
-| hardware | rung | concurrency | out tok/s (mean±SD) | $/M |
-|---|---:|---:|---|---|
-| kaggle_t4_x1 | 0 | flat 1–16 | ~19.6–19.7 ± ≤0.1 | n/a |
-| kaggle_t4_x1 | 1 | 32 | 508.9 ± 1.7 | n/a |
-| kaggle_t4_x1 | 2 | 32 | 440.6 ± 8.9 | n/a |
-| kaggle_t4_x1 | 3 | 32 | 488.8 ± 4.5 | n/a |
-| kaggle_t4_x2 | 4 | 32 | 241.7 ± 1.6 | n/a |
+## Kaggle (throughput only; free)
 
-Spot prices move; re-query before quoting these dollars elsewhere.
+| hardware | rung | c | mean | std | min | max |
+|---|---:|---:|---:|---:|---:|---:|
+| kaggle_t4_x1 | 0 | 1 | 19.6 | 0.1 | 19.5 | 19.8 |
+| kaggle_t4_x1 | 0 | 16 | 19.6 | 0.0 | 19.6 | 19.6 |
+| kaggle_t4_x1 | 1 | 32 | 508.9 | 1.7 | 507.6 | 510.9 |
+| kaggle_t4_x1 | 2 | 32 | 440.6 | 8.9 | 433.4 | 450.6 |
+| kaggle_t4_x1 | 3 | 32 | 488.8 | 4.5 | 486.1 | 494.0 |
+| kaggle_t4_x2 | 4 | 32 | 241.7 | 1.6 | 240.0 | 243.1 |
+
+Spot prices move; re-query before quoting dollars elsewhere.
