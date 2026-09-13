@@ -23,3 +23,6 @@ terraform/*.tfvars
 *.log
 .idea/
 .vscode/
+.cursor/
+Project_BRIEF.md
+PROJECT_BRIEF.md
