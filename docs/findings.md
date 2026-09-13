@@ -75,6 +75,31 @@ AWS cold start (container → `/health`): **206 s** — **single observation (n=
 **Negative result:** AWQ slower than fp16; c=32 ranges do not overlap. Accuracy
 not evaluated.
 
+### Why c=1 hurts most (hypothesis — not yet measured)
+
+At concurrency 1, decode is memory-bandwidth-bound. INT4 weights *should* move
+fewer bytes. Losing ~38% (22.0 vs 35.3 mean tok/s) is the opposite of that
+textbook. Leading hypothesis: the AWQ path **dequantizes to fp16 before the
+matmul**, so you pay dequant every step and never keep INT4 through the
+arithmetic — same *shape* as SourceBound’s onnxruntime fp16→fp32 on CPU.
+
+**Do not treat that as confirmed.** Protocol to test it (one Kaggle T4 session):
+[`docs/awq_diag.md`](awq_diag.md) / `bash scripts/kaggle_awq_diag.sh`.
+
+### AWQ diagnostic results
+
+_Pending Kaggle run. Rows will be tagged `AWQ_DIAG` in `results/benchmarks.csv`
+with `max_tokens` ∈ {64, 256, 1024}, c=1, n=3, plus `gpu_util_pct` /
+`gpu_mem_mb` from `--sample-gpu`. Fill this subsection only from those rows._
+
+| max_tokens | fp16 mean±SD | AWQ mean±SD | AWQ/fp16 | gpu util notes |
+|---:|---|---|---:|---|
+| 64 | _pending_ | _pending_ | | |
+| 256 | _pending_ | _pending_ | | |
+| 1024 | _pending_ | _pending_ | | |
+
+Kernel inspect log: `results/awq_kernel_inspect.txt` (after the session).
+
 ---
 
 ## Rung 3 — Prefix caching

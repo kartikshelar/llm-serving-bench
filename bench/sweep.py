@@ -12,6 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from bench.gpu_sample import GpuSample
 from bench.loadgen import run_load_sync
 from bench.metrics import RunResult, append_result
 
@@ -35,6 +36,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--csv", type=str, default=None, help="Path to benchmarks.csv")
     p.add_argument("--notes", type=str, default="")
     p.add_argument("--no-stream", action="store_true")
+    p.add_argument(
+        "--sample-gpu",
+        action="store_true",
+        help="Poll nvidia-smi during each run; fill gpu_util_pct / gpu_mem_mb",
+    )
     return p.parse_args(argv)
 
 
@@ -45,16 +51,23 @@ def main(argv: list[str] | None = None) -> int:
     for conc in args.concurrencies:
         for rep in range(1, args.repeats + 1):
             print(f"[sweep] rung={args.rung} concurrency={conc} repeat={rep}/{args.repeats}")
-            report = run_load_sync(
-                base_url=args.base_url,
-                concurrency=conc,
-                model=args.model,
-                workload_path=args.workload,
-                max_tokens=args.max_tokens,
-                warmup_n=args.warmup_n,
-                total_requests=args.requests_per_run,
-                stream=not args.no_stream,
-            )
+            gpu = GpuSample()
+            if args.sample_gpu:
+                gpu.start(interval_s=0.5)
+            try:
+                report = run_load_sync(
+                    base_url=args.base_url,
+                    concurrency=conc,
+                    model=args.model,
+                    workload_path=args.workload,
+                    max_tokens=args.max_tokens,
+                    warmup_n=args.warmup_n,
+                    total_requests=args.requests_per_run,
+                    stream=not args.no_stream,
+                )
+            finally:
+                if args.sample_gpu:
+                    gpu.stop()
             result = RunResult(
                 hardware=args.hardware,
                 gpu_count=args.gpu_count,
@@ -72,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
                 e2e_p50=round(report.e2e_p50, 3),
                 e2e_p95=round(report.e2e_p95, 3),
                 e2e_p99=round(report.e2e_p99, 3),
+                gpu_util_pct=gpu.util_pct,
+                gpu_mem_mb=gpu.mem_mb,
                 errors=report.errors,
                 notes=args.notes,
             )
